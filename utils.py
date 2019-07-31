@@ -33,10 +33,10 @@ def get_model_definition(df, target):
 def generate_base_model_definition(df, target):
     model_def = get_model_definition(df, target)
     #some versioning would be good
-    with open('model_definition_01.yaml', 'w') as yaml_file:
+    with open('model_definition.yaml', 'w') as yaml_file:
         yaml.dump(model_def, yaml_file, default_flow_style=False)
 
-    return model_def
+
 
 
 
