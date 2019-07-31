@@ -10,7 +10,6 @@ engine = db.create_engine('mysql+pymysql://root:swamp@localhost:3306/ml')
 connection = engine.connect()
 metadata = db.MetaData()
 titanic = db.Table('titanic', metadata, autoload=True, autoload_with=engine)
-#print(repr(metadata.tables['titanic']))
 
 
 query = db.select([titanic])
@@ -41,27 +40,14 @@ model_def['output_features'] =  [{'name': 'Survived', 'type': 'binary'}]
 
 
 
-'''
-model_def = {'input_features':
- [{'name': 'Class', 'type': 'category'},
-  {'name': 'Sex', 'type': 'category'},
-  {'name': 'Age',
-   'type': 'numerical',
-   'preprocessing': {'missing_value_strategy': 'fill_with_mean',
-                    'normalization' : 'zscore'}},
-  {'name': 'SibSp', 'type': 'numerical'},
-  {'name': 'Parch', 'type': 'numerical'},
-  {'name': 'Fare',
-   'type': 'numerical',
-   'preprocessing': {'missing_value_strategy': 'fill_with_mean'}},
-  {'name': 'Embarked', 'type': 'category'}],
- 'output_features':
- 
-'''
-
 ludwig_model = LudwigModel(model_def)
 train_status = ludwig_model.train(data_df=df)
 ludwig_model.save('model')
 
 with tarfile.open('titanic_model.tar.gz', 'w:gz') as tar:
     tar.add('model')
+
+
+#see https://github.com/opendatagroup/fastscore-model-deploy/blob/master/Python3%20Example%20Usage.ipynb
+#i don't think this works outside of jupyter
+
