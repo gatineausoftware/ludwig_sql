@@ -75,8 +75,32 @@ def get_agg_function(child):
         return f"max({table}.{column})"
 
 
+def get_prediction_data_set(feature_store):
+    e = feature_store["entity"]
+    e_tn = e["table"]
+    e_pk = e["pk"]
+    e_ed = e["effective_date"]
+    e_fe = e["features"]
+
+    sql2=f"select {e_tn}.{e_pk}"
+
+    for feature in e_fe:
+            sql2 += f", {e_tn}.{feature}"
+
+
+
+    sql3 = f" from {e_tn} where {e_tn}.{e_ed} = (select max({e_ed}) from {e_tn} {e_tn}1 where {e_tn}1.{e_pk} = {e_tn}.{e_pk})"
+
+    sql = sql2 + sql3
+
+    df = pd.read_sql(sql, connection)
+
+    return df
+
+
 
 def get_training_data_set(feature_store):
+
     eol = feature_store["eol"]
     eol_tn = eol["table"]
     eol_pk = eol["pk"]
@@ -86,20 +110,23 @@ def get_training_data_set(feature_store):
 
     sql1 = f"select {eol_tn}.{eol_pk}, {eol_tn}.{eol_od}, {eol_tn}.{eol_lb}"
 
+    sql2 = ""
+
+
     e= feature_store["entity"]
     e_tn = e["table"]
     e_pk = e["pk"]
     e_ed = e["effective_date"]
     e_fe = e["features"]
 
-    sql2 = ""
+
 
     for feature in e_fe:
-        sql2 += f", a.{feature}"
+        sql2 += f", {e_tn}1.{feature}"
 
 
-    sql3 = f" from {eol_tn} left join {e_tn} a on {eol_tn}.{eol_pk} = a.{e_pk} and \
-    a.{e_ed} = (select max({e_ed}) from {e_tn} a2 where a2.{e_pk} = {eol_tn}.{eol_pk} and a2.{e_ed} <= {eol_tn}.{eol_od})"
+    sql3 = f" from {eol_tn} left join {e_tn} {e_tn}1 on {eol_tn}.{eol_pk} = {e_tn}1.{e_pk} and \
+    {e_tn}1.{e_ed} = (select max({e_ed}) from {e_tn} {e_tn}2 where {e_tn}2.{e_pk} = {eol_tn}.{eol_pk} and {e_tn}2.{e_ed} <= {eol_tn}.{eol_od})"
 
 
 
@@ -114,11 +141,11 @@ def get_training_data_set(feature_store):
 
         sql4 += f" left join (select {eol_tn}.{eol_pk}, {eol_tn}.{eol_od}, {get_agg_function(child)} as {c_nm} from \
             {eol_tn} join {c_tn} on {eol_tn}.{eol_pk} = {c_tn}.{c_parentk} and {eol_tn}.{eol_od} >= {c_tn}.{c_d} group by \
-            {eol_tn}.{eol_pk}, {eol_tn}.{eol_od} ) c on \
-            {eol_tn}.{eol_pk} = c.{eol_pk} and {eol_tn}.{eol_od} = c.{eol_od}"
+            {eol_tn}.{eol_pk}, {eol_tn}.{eol_od} ) {c_tn}{c_nm}1 on \
+            {eol_tn}.{eol_pk} = {c_tn}{c_nm}1.{eol_pk} and {eol_tn}.{eol_od} = {c_tn}{c_nm}1.{eol_od}"
 
 
-        sql2 += f" , c.{c_nm}"
+        sql2 += f" , {c_tn}{c_nm}1.{c_nm}"
 
 
 
@@ -136,8 +163,14 @@ add_eol("agent_eol", "agent_id", "obvservation_date", "label")
 add_entity("agent", "agent", "agent_id", "effective_date", ["feature1", "feature2"])
 
 add_aggregation_child("num_complaints","complaints_history", "complaint_id", "agent_id", "complaint_date", "complaint_id", "count")
+add_aggregation_child("max_feature","complaints_history", "complaint_id", "agent_id", "complaint_date", "complaint_feature", "max")
+
 
 df = get_training_data_set(feature_store)
+
+print(df)
+
+df = get_prediction_data_set(feature_store)
 
 print(df)
 
