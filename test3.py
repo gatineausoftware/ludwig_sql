@@ -89,9 +89,25 @@ def get_prediction_data_set(feature_store):
 
 
 
-    sql3 = f" from {e_tn} where {e_tn}.{e_ed} = (select max({e_ed}) from {e_tn} {e_tn}1 where {e_tn}1.{e_pk} = {e_tn}.{e_pk})"
+    sql3 = f" from {e_tn}"
 
-    sql = sql2 + sql3
+    sql4 = ""
+
+    for child in feature_store["child"]:
+        c_nm = child["name"]
+        c_tn = child["table"]
+        c_pk = child["pk"]
+        c_parentk = child["parent_key"]
+        c_d = child["date"]
+
+        sql4 += f" left join (select {c_tn}.{c_parentk}, {get_agg_function(child)} as {c_nm} from {c_tn} group by {c_tn}.{c_parentk}) {c_tn}{c_nm} on {e_tn}.{e_pk} = {c_tn}{c_nm}.{c_parentk}"
+
+        sql2 += f", {c_tn}{c_nm}.{c_nm}"
+
+
+    sql5 = f" where {e_tn}.{e_ed} = (select max({e_ed}) from {e_tn} {e_tn}1 where {e_tn}1.{e_pk} = {e_tn}.{e_pk})"
+
+    sql = sql2 + sql3 + sql4 + sql5
 
     df = pd.read_sql(sql, connection)
 
@@ -158,6 +174,11 @@ def get_training_data_set(feature_store):
 
 
 
+
+
+
+
+
 add_eol("agent_eol", "agent_id", "obvservation_date", "label")
 
 add_entity("agent", "agent", "agent_id", "effective_date", ["feature1", "feature2"])
@@ -169,6 +190,8 @@ add_aggregation_child("max_feature","complaints_history", "complaint_id", "agent
 df = get_training_data_set(feature_store)
 
 print(df)
+
+
 
 df = get_prediction_data_set(feature_store)
 
