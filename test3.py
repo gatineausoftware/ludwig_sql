@@ -53,8 +53,8 @@ def add_entity(name, table, pk, effective_date, features):
     feature_store["entity"] = entity
 
 
-def add_aggregation_child(name, table, pk, effective_date, column, type):
-    entity = {"name": name, "table": table, "pk": pk, "effective_date": effective_date, "column": column, "type": type}
+def add_aggregation_child(name, table, pk, parent_key, tdate, column, type):
+    entity = {"name": name, "table": table, "pk": pk, "parent_key": parent_key, "date": tdate, "column": column, "type": type}
     feature_store["child"].append(entity)
 
 
@@ -63,7 +63,12 @@ def add_eol(table, pk, observation_date, label):
     feature_store["eol"] = entity
 
 
-def get_agg_function(table, column, agg):
+def get_agg_function(child):
+
+    table = child["table"]
+    column = child["column"]
+    agg = child["type"]
+
     if agg=="count":
         return f"count(distinct {table}.{column})"
     elif agg == "max":
@@ -97,32 +102,31 @@ def get_training_data_set(feature_store):
     a.{e_ed} = (select max({e_ed}) from {e_tn} a2 where a2.{e_pk} = {eol_tn}.{eol_pk} and a2.{e_ed} <= {eol_tn}.{eol_od})"
 
 
+
     sql4 = ""
 
-    left
-    join \
-        (select
-    agent_eol.agent_id, agent_eol.obvservation_date, count(distinct
-    complaints_history.complaint_id) as num_complaints, max(complaints_history.complaint_feature) as max_f
-    from agent_eol join
-    complaints_history
-    on \
-            agent_eol.agent_id = complaints_history.agent_id and \
-                                 agent_eol.obvservation_date >= complaints_history.complaint_date \
-            group
-    by
-    agent_eol.agent_id, agent_eol.obvservation_date) c \
-            on
-    agent_eol.agent_id = c.agent_id and agent_eol.obvservation_date = c.obvservation_date
-
     for child in feature_store["child"]:
-        sql4 += "left join (select {eol_tn}.{eol_pk}"
+        c_nm = child["name"]
+        c_tn = child["table"]
+        c_pk = child["pk"]
+        c_parentk = child["parent_key"]
+        c_d = child["date"]
+
+        sql4 += f" left join (select {eol_tn}.{eol_pk}, {eol_tn}.{eol_od}, {get_agg_function(child)} as {c_nm} from \
+            {eol_tn} join {c_tn} on {eol_tn}.{eol_pk} = {c_tn}.{c_parentk} and {eol_tn}.{eol_od} >= {c_tn}.{c_d} group by \
+            {eol_tn}.{eol_pk}, {eol_tn}.{eol_od} ) c on \
+            {eol_tn}.{eol_pk} = c.{eol_pk} and {eol_tn}.{eol_od} = c.{eol_od}"
+
+
+        sql2 += f" , c.{c_nm}"
 
 
 
-    sql = sql1 + sql2 + sql3
+    sql = sql1 + sql2 + sql3 + sql4
 
-    return sql
+    df = pd.read_sql(sql, connection)
+
+    return df
 
 
 
@@ -131,9 +135,14 @@ add_eol("agent_eol", "agent_id", "obvservation_date", "label")
 
 add_entity("agent", "agent", "agent_id", "effective_date", ["feature1", "feature2"])
 
-sql = get_training_data_set(feature_store)
+add_aggregation_child("num_complaints","complaints_history", "complaint_id", "agent_id", "complaint_date", "complaint_id", "count")
 
-print(sql)
+df = get_training_data_set(feature_store)
+
+print(df)
+
+
+
 
 
 
