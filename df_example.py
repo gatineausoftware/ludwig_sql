@@ -1,0 +1,60 @@
+from pytz import timezone, utc
+from datetime import datetime, timedelta
+import pandas as pd
+import numpy as np
+
+
+from feature_store import add_entity_df, get_prediction_data_set, get_training_data_set
+
+
+
+days = [datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0).replace(tzinfo=utc) \
+        - timedelta(day) for day in range(3)][::-1]
+
+customers = [1001, 1002, 1003, 1004, 1005]
+
+
+customer_features = pd.DataFrame(
+    {
+        "datetime": [day for day in days for customer in customers],
+        "customer_id": [customer for day in days for customer in customers],
+        "daily_transactions": [np.random.rand() * 10 for _ in range(len(days) * len(customers))],
+        "total_transactions": [np.random.randint(100) for _ in range(len(days) * len(customers))],
+    }
+)
+
+add_entity_df("customers", "customer_transactions", customer_features, "customer_id", "datetime")
+
+
+
+
+#generate training data set
+
+days = [datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0).replace(tzinfo=utc) \
+        - timedelta(day) for day in range(2)][::-1]
+
+customers = [1001, 1002, 1003, 1005]
+
+
+customer_eol = pd.DataFrame(
+    {
+        "observation_time": [day for day in days for customer in customers],
+        "customer_id": [customer for day in days for customer in customers],
+        "prediction": [np.random.rand()  for _ in range(len(days) * len(customers))],
+
+    }
+)
+
+
+df = get_training_data_set("customers", {"pk": "customer_id", "observation_date": "observation_time", "label": "prediction"}, customer_eol)
+
+print(df)
+
+
+#generate prediction data set
+
+
+df = get_prediction_data_set("customers")
+
+print(df)
+

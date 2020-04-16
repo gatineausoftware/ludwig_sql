@@ -53,6 +53,9 @@ def add_entity(name, table, pk, effective_date, features):
     feature_store["entity"] = entity
 
 
+def add_entity_df(df, entity_id, effective_date):
+
+
 def add_aggregation_child(name, table, pk, parent_key, tdate, column, type):
     entity = {"name": name, "table": table, "pk": pk, "parent_key": parent_key, "date": tdate, "column": column, "type": type}
     feature_store["child"].append(entity)
