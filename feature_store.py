@@ -13,12 +13,12 @@ feature_store = {}
 
 
 def add_entity_set(entity_set):
-    feature_store[entity_set] = {"child": []}
+    feature_store[entity_set] = {"entities": [], "child": []}
 
 def add_entity(entity_set, name, table, pk, effective_date, features):
 
     entity = {"name": name, "table": table, "pk": pk, "effective_date": effective_date, "features": features}
-    feature_store[entity_set]["entity"] = entity
+    feature_store[entity_set]["entities"].append(entity)
 
 
 
@@ -42,6 +42,30 @@ def add_entity_df(entity_set, entity_name, df, entity_id, effective_date):
     add_entity_set(entity_set)
 
     add_entity(entity_set, entity_name, entity_name, entity_id, effective_date, features)
+
+
+
+
+def add_child_df(entity_set, entity_name, df, entity_id, parent_id, date):
+    try:
+        frame = df.to_sql(entity_name, connection, if_exists='replace');
+
+    except ValueError as vx:
+        print(vx)
+        return
+
+    except Exception as ex:
+        print(ex)
+        return
+
+
+def add_child_features(entity_set, entity_name, entity_id, parent_id, date, features):
+
+
+
+    for feature in features:
+        add_aggregation_child(entity_set, feature["name"], entity_name, entity_id, parent_id,
+                              date, feature["feature"], feature["function"])
 
 
 
@@ -82,12 +106,14 @@ def get_agg_function(child):
         return f"count(distinct {table}.{column})"
     elif agg == "max":
         return f"max({table}.{column})"
+    elif agg == "sum":
+        return f"sum({table}.{column})"
 
 
 
 def get_prediction_data_set(entity_set):
 
-    e = feature_store[entity_set]["entity"]
+    e = feature_store[entity_set]["entities"][0]  #just take the first one for now
     e_tn = e["table"]
     e_pk = e["pk"]
     e_ed = e["effective_date"]
@@ -147,7 +173,7 @@ def get_training_data_set(entity_set, eol, df=None):
     sql2 = ""
 
 
-    e= entity_set["entity"]
+    e= entity_set["entities"][0]
     e_tn = e["table"]
     e_pk = e["pk"]
     e_ed = e["effective_date"]
@@ -188,4 +214,31 @@ def get_training_data_set(entity_set, eol, df=None):
     df = pd.read_sql(sql, connection)
 
     return df
+
+
+def get_features(entity_set):
+
+    es = feature_store[entity_set]
+
+    features=[]
+    for entity in es["entities"]:
+        en = entity["table"]
+        for feature in entity["features"]:
+            features.append(f"{en}.{feature}")
+
+
+    for entity in es["child"]:
+        en = entity["table"]
+        f = entity["name"]
+        features.append(f"{en}.{f}")
+
+
+    return features
+
+
+
+
+
+
+
 
