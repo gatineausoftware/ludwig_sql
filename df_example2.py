@@ -34,6 +34,8 @@ add_entity_df(df=df, entity_set="nyl_agents", name="agent_survey", entity_id="ag
 
 
 
+
+
 days = [datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0).replace(tzinfo=utc) \
         - timedelta(day * 365) for day in range(3)][::-1]
 
@@ -80,7 +82,7 @@ add_child_df(df=df, entity_set="nyl_agents", name="agent_sales", entity_id="id",
 
 
 
-agent_sales_aggregation_features = [{"feature": "feature_1","function":"sum", "name": "total_sales"}, {"feature": "feature_1", "function":"max", "name": "max_sales"}]
+agent_sales_aggregation_features = [{"feature": "feature_1","function":"sum", "name": "total_sales", "time_window": "full_history"}, {"feature": "feature_1", "function":"max", "name": "max_sales", "time_window": "full_history"}]
 
 
 add_child_features("nyl_agents", "agent_sales", agent_sales_aggregation_features)
@@ -112,11 +114,13 @@ print(df)
 
 print(df.columns)
 
-#generate prediction data set
+
+#generate prediction data set for batch...
 
 
-df = get_prediction_data_set("nyl_agents")
+df = get_prediction_data_set("nyl_agents", "agent_survey")
 
 print(df)
 
 
+#generate prediciton data set for sepcific entitis...

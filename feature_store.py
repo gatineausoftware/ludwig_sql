@@ -117,37 +117,53 @@ def get_agg_function(table, child_feature):
         return f"sum({table}.{column})"
 
 
+#need to define one of the tables as the 'master entity' then do left joins from it
 
-def get_prediction_data_set(entity_set):
+
+def get_prediction_data_set(entity_set, master_entity):
 
     entity_set = feature_store[entity_set]
 
-    sql2 = None
-    sql3= None
+
+
+    e = entity_set["entities"][master_entity]
+    me_tn = e["table"]
+    me_pk = e["pk"]
+    me_ed = e["effective_date"]
+    me_fe = e["features"]
+
+    sql1=f"select {me_tn}.{me_pk}"
+
+    for feature in me_fe:
+        sql1 += f", {me_tn}.{feature}"
+
+    sql2 = f" from {me_tn}"
+
+    sql5 = f" where {me_tn}.{me_ed} = (select max({me_ed}) from {me_tn} {me_tn}1 where {me_tn}1.{me_pk} = {me_tn}.{me_pk})"
+
+    sql3 = ""
+    sql4 = ""
+
+
 
     for k, e in entity_set["entities"].items():
+        if k == master_entity:
+            continue
 
         e_tn = e["table"]
         e_pk = e["pk"]
         e_ed = e["effective_date"]
         e_fe = e["features"]
 
-        if not sql2:
-            sql2=f"select {e_tn}.{e_pk}"
-        else:
-            pass
-
         for feature in e_fe:
-            sql2 += f", {e_tn}.{feature}"
+            sql1 += f", {e_tn}.{feature}"
 
-        if not sql3:
-            sql3 = f" from {e_tn}"
-        else:
-            sql3 += f". {e_tn}"
+        sql3 = f" left join {e_tn} on {e_tn}.{e_pk} = {me_tn}.{me_pk}"
 
-        break #fix
 
-    sql4=""
+        sql5 += f" and {e_tn}.{e_ed} = (select max({e_ed}) from {e_tn} {e_tn}1 where {e_tn}1.{e_pk} = {e_tn}.{e_pk})"
+
+
 
     for _, child in entity_set["child_entities"].items():
 
@@ -160,13 +176,13 @@ def get_prediction_data_set(entity_set):
             c_nm = f["name"]
 
 
-            sql4 += f" left join (select {c_tn}.{c_parentk}, {get_agg_function(c_tn, f)} as {c_nm} from {c_tn} group by {c_tn}.{c_parentk}) {c_tn}{c_nm} on {e_tn}.{e_pk} = {c_tn}{c_nm}.{c_parentk}"
+            sql4 += f" left join (select {c_tn}.{c_parentk}, {get_agg_function(c_tn, f)} as {c_nm} from {c_tn} group by {c_tn}.{c_parentk}) {c_tn}{c_nm} on {me_tn}.{me_pk} = {c_tn}{c_nm}.{c_parentk}"
 
-            sql2 += f", {c_tn}{c_nm}.{c_nm}"
+            sql1 += f", {c_tn}{c_nm}.{c_nm}"
 
-    sql5 = f" where {e_tn}.{e_ed} = (select max({e_ed}) from {e_tn} {e_tn}1 where {e_tn}1.{e_pk} = {e_tn}.{e_pk})"
 
-    sql = sql2 + sql3 + sql4 + sql5
+
+    sql = sql1 + sql2 + sql3 + sql4 + sql5
 
     df = pd.read_sql(sql, connection)
 
