@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 
 
-from feature_store import add_entity_df, get_prediction_data_set, get_training_data_set
+from feature_store import add_entity_df, get_prediction_data_set, get_training_data_set, get_prediction_features
 
 
 
@@ -14,7 +14,7 @@ days = [datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0).rep
 customers = [1001, 1002, 1003, 1004, 1005]
 
 
-customer_features = pd.DataFrame(
+df = pd.DataFrame(
     {
         "datetime": [day for day in days for customer in customers],
         "customer_id": [customer for day in days for customer in customers],
@@ -23,7 +23,7 @@ customer_features = pd.DataFrame(
     }
 )
 
-add_entity_df("customers", "customer_transactions", customer_features, "customer_id", "datetime")
+add_entity_df(df, entity_set="customers", name="customer_transactions", entity_id="customer_id", effective_date="datetime")
 
 
 
@@ -33,7 +33,7 @@ add_entity_df("customers", "customer_transactions", customer_features, "customer
 days = [datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0).replace(tzinfo=utc) \
         - timedelta(day) for day in range(2)][::-1]
 
-customers = [1001, 1002, 1003, 1005]
+customers = [1001, 1002, 1003, 1004, 1005]
 
 
 customer_eol = pd.DataFrame(
@@ -51,10 +51,14 @@ df = get_training_data_set("customers", {"pk": "customer_id", "observation_date"
 print(df)
 
 
-#generate prediction data set
 
+online_features = get_prediction_features(entity_set="customers", entity_name="customer_transactions",
+    features=[
+        "daily_transactions",
+        "total_transactions",
+    ],
+    entity_rows=[1001, 1002, 1004]
 
-df = get_prediction_data_set("customers")
+)
 
-print(df)
-
+print(online_features)

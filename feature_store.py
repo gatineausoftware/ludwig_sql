@@ -120,6 +120,43 @@ def get_agg_function(table, child_feature):
 #need to define one of the tables as the 'master entity' then do left joins from it
 
 
+def get_prediction_features(entity_set, entity_name, features, entity_rows):
+    entity_set = feature_store[entity_set]
+    e = entity_set["entities"][entity_name]
+    me_tn = e["table"]
+    me_pk = e["pk"]
+    me_ed = e["effective_date"]
+    me_fe = e["features"]
+
+    sql1 = f"select {me_tn}.{me_pk}"
+
+    for feature in me_fe:
+        sql1 += f", {me_tn}.{feature}"
+
+    sql2 = f" from {me_tn}"
+
+    sql3 = f" where {me_tn}.{me_ed} = (select max({me_ed}) from {me_tn} {me_tn}1 where {me_tn}1.{me_pk} = {me_tn}.{me_pk})"
+
+
+
+    sql3 += f" and {me_tn}.{me_pk} in "
+
+
+    sql4 = f"({entity_rows[0]}"
+
+    for row in entity_rows[1:]:
+        sql4 += f",{row} "
+
+    sql4 += ")"
+    sql = sql1 + sql2 + sql3 + sql4
+
+
+    df = pd.read_sql(sql, connection)
+
+    return df
+
+
+
 def get_prediction_data_set(entity_set, master_entity):
 
     entity_set = feature_store[entity_set]

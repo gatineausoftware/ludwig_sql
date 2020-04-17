@@ -118,7 +118,7 @@ print(df.columns)
 #generate prediction data set for batch...
 
 
-df = get_prediction_data_set("nyl_agents", "agent_survey")
+df = get_prediction_data_set(entity_set="nyl_agents", master_entity="agent_survey")
 
 print(df)
 
