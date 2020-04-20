@@ -1,6 +1,9 @@
 
 import sqlalchemy as db
 import pandas as pd
+from sqlalchemy import MetaData
+from sqlalchemy import Table
+
 
 
 engine = db.create_engine('mysql+pymysql://root:swamp@localhost:3306/ml')
@@ -14,6 +17,9 @@ feature_store = {
                  }
 
 
+metadata = MetaData()
+
+
 def create_new_entity_set(name, entities, relationships):
     feature_store["entity_sets"][name] = {}
     feature_store["entity_sets"][name]["entities"] = entities
@@ -22,6 +28,14 @@ def create_new_entity_set(name, entities, relationships):
 
 def add_entity(entity):
     feature_store["entities"][entity["name"]] = entity
+    feature_store["entities"][entity["name"]]["raw_features"] = []
+
+    metadata.reflect(bind=engine)
+
+    for c in metadata.tables[entity["table"]].columns:
+        feature_store["entities"][entity["name"]]["raw_features"].append(c.name)
+
+
 
 
 
@@ -105,14 +119,30 @@ def get_events(features):
 
 
 
-def get_training_df(features, eol, df):
-
+def get_event_training_df(features):
     entity_set_name = features["entity_set"]
     target = features["target_entity"]
 
-    if df is not None:
-        write_eol(entity_set_name, df)
+
+
+
+
+def get_training_df(features):
+
+    entity_set_name = features["entity_set"]
+    target = features["target_entity"]
+    obs = features["observations"]
+
+
+    if obs["type"] == "eol":
+        eol = obs["eol"]
         eol["table"] = f"{entity_set_name}_eol"
+        if obs["data"] is not None:
+            write_eol(entity_set_name, obs["data"])
+
+
+    else:
+        return get_event_training_df(features)
 
 
     eol_tn = eol["table"]
@@ -236,122 +266,22 @@ def get_prediction_df(features):
 
 
 def list_features(feature_set):
-    pass
 
+    features = {}
 
+    for _, v in feature_store["entities"].items():
+        if v["name"] not in feature_store["entity_sets"][feature_set]["entities"]:
+            continue
+        features[v["name"]] = {}
+        features[v["name"]]["raw_features"] = []
+        features[v["name"]]["raw_features"].extend(v["raw_features"])
 
+        if "aggregation_features" in v.keys():
+            features[v["name"]]["calulated_features"] = []
+            features[v["name"]]["calulated_features"].extend(v["aggregation_features"])
 
 
-
-
-agent_entity = {"name": "agent", "table": "agent", "type": "primary", "index": "agent_id", "time": {"field": "effective_date", "type": "effective_date"}}
-
-
-add_entity(agent_entity)
-
-
-
-acxiom_entity = {"name": "acxiom", "table": "agent_acxiom", "type": "primary", "index": "agent_id", "time": {"field": "date", "type": "effective_date"}}
-
-add_entity(acxiom_entity)
-
-
-
-
-comission_events = {"name": "agent_commission", "table": "agent_sales", "type": "event", 'index': "id", "time": {"field": "date", "type": "event"}}
-
-
-add_entity(comission_events)
-
-
-
-
-relationships =  [
-            ("one_to_one", {"name": "agent", "index": "agent_id"}, {"name": "acxiom", "index": "agent_id"}),
-            ("one_to_many", {"name": "agent", "index": "agent_id"}, {"name": "agent_commission",  "index": "agent_id"})
-        ]
-
-
-
-
-
-create_new_entity_set(name="nyl_agents", entities=["agent", "acxiom", "agent_commission"], relationships=relationships)
-
-
-
-
-agent_commission_features = {"total_sales": {"feature": "amount","function":"sum", "name": "total_sales", "time_window": "full_history"},
-                             "max_sales":  {"feature": "amount", "function":"max", "name": "max_sales", "time_window": "full_history"},
-                             "total_num_sales":   {"feature": "id", "function": "count", "name": "total_num_sales", "time_window": "full_history"}
-                            }
-
-
-add_aggregation_features("agent_commission", agent_commission_features)
-
-
-list_features("agents")
-
-
-
-
-
-features = {"entity_set": "nyl_agents",
-            "target_entity": "agent",
-            "features": {
-                         "agent": ["feature_1", "feature_2", "feature_6"],
-                         "acxiom": ["zipcode", "num_household"],
-                         "agent_commission": ["total_sales", "max_sales"]
-
-                    }
-            }
-
-
-
-eol_df = []
-
-eol = {"pk": "agent_id", "observation_date": "observation_time", "label": "prediction"}
-
-
-
-
-df = get_training_df(features, eol, eol_df)
-
-print(df)
-
-df = get_prediction_df(features)
-
-print(df)
-
-eol_df = []
-
-features = {"entity_set": "nyl_agents",
-            "target_entity": "agent_commission",
-            "features": [
-                            ("agent", "feature_1"),
-                            ("agent", "feature_2"),
-                            ("agent", "feature_6"),
-                            ("acxiom", "zipcode"),
-                            ("acxiom", "num_household"),
-                            ("agent_commission", "amount"),
-                            ("agent_commission", "total_sales")
-            ]}
-
-
-
-eol = {"pk": "id", "observation_date": "observation_time", "label": "prediction"}
-
-#df = get_training_df(features, eol, eol_df)
-
-#print(df)
-
-#df = get_prediction_df(features)
-
-#print(df)
-
-
-
-
-
+    return features
 
 
 
