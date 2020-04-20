@@ -15,7 +15,8 @@ feature_store = {}
 def add_entity_set(entity_set):
     feature_store[entity_set] = {"entities": {}, "child_entities": {}}
 
-def add_entity(entity_set, name, table, pk, effective_date, features):
+
+def add_entity_table(entity_set, name, table, pk, effective_date, features):
 
     entity = {"name": name, "table": table, "pk": pk, "effective_date": effective_date, "features": features}
     feature_store[entity_set]["entities"][name] = entity
@@ -42,7 +43,7 @@ def add_entity_df(df, entity_set, name, entity_id, effective_date):
     if entity_set not in feature_store.keys():
         add_entity_set(entity_set)
 
-    add_entity(entity_set, name, name, entity_id, effective_date, features)
+    add_entity_table(entity_set, name, name, entity_id, effective_date, features)
 
 
 
@@ -67,6 +68,13 @@ def add_child_df(df, entity_set, name, entity_id, parent_id, date):
     feature_store[entity_set]["child_entities"][name] = entity_desc
 
 
+def add_child_table(entity_set, table, entity_id, parent_id, date):
+    if entity_set not in feature_store.keys():
+        add_entity_set(entity_set)
+
+    entity_desc = {"name": table, "table": table, "pk": entity_id, "parent_key": parent_id, "date": date, "features": []}
+
+    feature_store[entity_set]["child_entities"][table] = entity_desc
 
 
 def add_child_features(entity_set, entity, features):
@@ -92,20 +100,8 @@ def write_eol(entity_set, df):
 
 
 
-def add_aggregation_child(entity_set, name, table, pk, parent_key, tdate, column, type):
-    entity = {"name": name, "table": table, "pk": pk, "parent_key": parent_key, "date": tdate, "column": column, "type": type}
-    feature_store[entity_set]["child"].append(entity)
-
-
-def add_eol(entity_set, table, pk, observation_date, label):
-    entity = {"table": table, "pk": pk, "observation_date": observation_date, "label": label}
-    feature_store[entity_set]["eol"] = entity
-
-
-
 def get_agg_function(table, child_feature):
 
-    #table = child_feature["table"]
     column = child_feature["feature"]
     agg = child_feature["function"]
 
@@ -157,13 +153,13 @@ def get_prediction_features(entity_set, entity_name, features, entity_rows):
 
 
 
-def get_prediction_data_set(entity_set, master_entity):
+def get_prediction_data_set(entity_set, root_entity):
 
     entity_set = feature_store[entity_set]
 
 
 
-    e = entity_set["entities"][master_entity]
+    e = entity_set["entities"][root_entity]
     me_tn = e["table"]
     me_pk = e["pk"]
     me_ed = e["effective_date"]
@@ -184,7 +180,7 @@ def get_prediction_data_set(entity_set, master_entity):
 
 
     for k, e in entity_set["entities"].items():
-        if k == master_entity:
+        if k == root_entity:
             continue
 
         e_tn = e["table"]
@@ -301,17 +297,15 @@ def get_features(entity_set):
     es = feature_store[entity_set]
 
     features=[]
-    for entity in es["entities"]:
-        en = entity["table"]
+    for name, entity in es["entities"].items():
         for feature in entity["features"]:
-            features.append(f"{en}.{feature}")
+            features.append(f"{name}.{feature}")
 
+    for name, entity in es["child_entities"].items():
 
-    for entity in es["child"]:
-        en = entity["table"]
-        f = entity["name"]
-        features.append(f"{en}.{f}")
-
+        for feature in entity["features"]:
+            fn = feature["name"]
+            features.append(f"{name}.{fn}")
 
     return features
 

@@ -29,7 +29,8 @@ df = pd.DataFrame(
     }
 )
 
-add_entity_df(df=df, entity_set="nyl_agents", name="agent_survey", entity_id="agent_id", effective_date="effective_date")
+
+add_entity_df(df=df, entity_set="nyl_agents", name="agent", entity_id="agent_id", effective_date="effective_date")
 
 
 
@@ -44,15 +45,15 @@ agents = [1001, 1002, 1003, 1004, 1005]
 
 df = pd.DataFrame(
     {
-        "effective_date": [day for day in days for agent in agents],
+        "date": [day for day in days for agent in agents],
         "agent_id": [agent for day in days for agent in agents],
-        "axciom_feature_1": [np.random.rand() * 10 for _ in range(len(days) * len(agents))],
-        "axciom_feature_2": [np.random.rand() * 10 for _ in range(len(days) * len(agents))],
+        "zipcode": [np.random.rand() * 10 for _ in range(len(days) * len(agents))],
+        "num_household": [np.random.rand() * 10 for _ in range(len(days) * len(agents))],
 
     }
 )
 
-add_entity_df(df, entity_set="nyl_agents", name="agent_axciom", entity_id="agent_id", effective_date="effective_date")
+add_entity_df(df, entity_set="nyl_agents", name="agent_acxiom", entity_id="agent_id", effective_date="date")
 
 
 
@@ -69,7 +70,7 @@ df = pd.DataFrame(
         "id": [1000 + x for x in range(len(days) * len(agents))],
         "date": [day for day in days for agent in agents],
         "agent_id": [agent for day in days for agent in agents],
-        "feature_1": [np.random.rand() * 100 for _ in range(len(days) * len(agents))],
+        "amount": [np.random.rand() * 100 for _ in range(len(days) * len(agents))],
         "feature_2": [np.random.rand() * 100  for _ in range(len(days) * len(agents))],
         "feature_3": [np.random.rand() * 100 for _ in range(len(days) * len(agents))],
 
@@ -82,7 +83,7 @@ add_child_df(df=df, entity_set="nyl_agents", name="agent_sales", entity_id="id",
 
 
 
-agent_sales_aggregation_features = [{"feature": "feature_1","function":"sum", "name": "total_sales", "time_window": "full_history"}, {"feature": "feature_1", "function":"max", "name": "max_sales", "time_window": "full_history"}]
+agent_sales_aggregation_features = [{"feature": "amount","function":"sum", "name": "total_sales", "time_window": "full_history"}, {"feature": "amount", "function":"max", "name": "max_sales", "time_window": "full_history"}]
 
 
 add_child_features("nyl_agents", "agent_sales", agent_sales_aggregation_features)
@@ -112,13 +113,13 @@ df = get_training_data_set("nyl_agents", {"pk": "agent_id", "observation_date": 
 
 print(df)
 
-print(df.columns)
+#print(df.columns)
 
 
 #generate prediction data set for batch...
 
 
-df = get_prediction_data_set(entity_set="nyl_agents", master_entity="agent_survey")
+df = get_prediction_data_set(entity_set="nyl_agents", root_entity="agent")
 
 print(df)
 

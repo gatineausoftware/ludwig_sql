@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 
 
-from feature_store import add_entity_df, get_prediction_data_set, get_training_data_set, get_prediction_features
+from feature_store import add_entity_df, get_training_data_set, get_prediction_features
 
 
 
