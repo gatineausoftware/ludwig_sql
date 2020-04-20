@@ -169,8 +169,70 @@ def get_training_df(features, eol, df):
 
 
 
-def get_prediction_df():
-    pass
+
+def get_prediction_df(features):
+
+    entity_set_name = features["entity_set"]
+    target = features["target_entity"]
+    e = feature_store["entities"][target]
+
+    me_fe = features["features"][target]
+    me_tn = e["table"]
+    me_pk = e["index"]
+    me_ed = e["time"]["field"]
+
+    sql1=f"select {me_tn}.{me_pk}"
+
+    for feature in me_fe:
+        sql1 += f", {me_tn}.{feature}"
+
+    sql2 = f" from {me_tn}"
+
+    sql5 = f" where {me_tn}.{me_ed} = (select max({me_ed}) from {me_tn} {me_tn}1 where {me_tn}1.{me_pk} = {me_tn}.{me_pk})"
+
+    sql3 = ""
+    sql4 = ""
+
+    for e, e_fe in get_primary_entities(features):
+        if e["name"] == target:
+            continue
+
+        e_tn = e["table"]
+        e_pk = e["index"]
+        e_ed = e["time"]["field"]
+
+
+        for feature in e_fe:
+            sql1 += f", {e_tn}.{feature}"
+
+        sql3 = f" left join {e_tn} on {e_tn}.{e_pk} = {me_tn}.{me_pk}"
+
+
+        sql5 += f" and {e_tn}.{e_ed} = (select max({e_ed}) from {e_tn} {e_tn}1 where {e_tn}1.{e_pk} = {e_tn}.{e_pk})"
+
+
+    for child, cf in get_events(features):
+
+        c_tn = child["table"]
+        c_parentk = get_parent_key(entity_set_name, target, child["name"])
+        c_d = child["time"]["field"]
+
+        for f in cf:
+            c_nm = f["name"]
+            sql4 += f" left join (select {c_tn}.{c_parentk}, {get_agg_function(c_tn, f)} as {c_nm} from {c_tn} group by {c_tn}.{c_parentk}) {c_tn}{c_nm} on {me_tn}.{me_pk} = {c_tn}{c_nm}.{c_parentk}"
+            sql1 += f", {c_tn}{c_nm}.{c_nm}"
+
+
+
+    sql = sql1 + sql2 + sql3 + sql4 + sql5
+
+    df = pd.read_sql(sql, connection)
+
+    return df
+
+
+
+
 
 
 def list_features(feature_set):
@@ -276,15 +338,15 @@ features = {"entity_set": "nyl_agents",
 
 
 
+eol = {"pk": "id", "observation_date": "observation_time", "label": "prediction"}
 
+#df = get_training_df(features, eol, eol_df)
 
-df = get_training_df(features, eol_df)
+#print(df)
 
-print(df)
+#df = get_prediction_df(features)
 
-df = get_prediction_df(features)
-
-print(df)
+#print(df)
 
 
 
