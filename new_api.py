@@ -103,8 +103,11 @@ def get_parent_key(entity_set_name, target_name, child_name):
             return c["index"]
 
 
-
-
+def get_join_key(entity_set_name, target_name, peer_name):
+    relationships = feature_store["entity_sets"][entity_set_name]["relationships"]
+    for (t, p, c) in relationships:
+        if p["name"] == target_name and c["name"] == peer_name:
+            return c["index"]
 
 def get_primary_entities(features):
 
@@ -113,21 +116,153 @@ def get_primary_entities(features):
             yield feature_store["entities"][k], v
 
 
-def get_events(features):
+def get_agg_features(features):
     for k,v in features["features"].items():
-        if feature_store["entities"][k]["type"] == "event":
-            #TO DO...might be non agg features
-            agg_features = [feature_store["entities"][k]["aggregation_features"][f] for f in v]
-            yield feature_store["entities"][k], agg_features
+        entity = feature_store["entities"][k]
+        if entity["type"] == "event":
+            agg_features = []
+            for f in v:
+                if f in entity["aggregation_features"].keys():
+                    agg_features.append(entity["aggregation_features"][f])
+
+            yield entity, agg_features
 
 
 
-def get_event_training_df(features):
+def get_raw_features_from_event_table(features):
+
     entity_set_name = features["entity_set"]
     target = features["target_entity"]
+    entity = feature_store["entities"][target]
+    if entity["type"] == "event":
+        raw = [f for f in entity["raw_features"] if f in features["features"][target]]
+        return entity, raw
+
+
+def get_training_df_el(features):
+
+    entity_set_name = features["entity_set"]
+    target = features["target_entity"]
+    obs = features["observations"]
+
+    eol = obs["eol"]
+    eol["table"] = f"{entity_set_name}_eol"
+    if obs["data"] is not None:
+        write_eol(entity_set_name, obs["data"])
+
+    eol_tn = eol["table"]
+    eol_pk = eol["pk"]
+    eol_lb = eol["label"]
+
+    sql1 = f"select {eol_tn}.{eol_pk}, {eol_tn}.{eol_lb}"
+
+    sql2 = f" from {eol_tn}"
+
+    for e, e_fe in get_primary_entities(features):
+        e_tn = e["table"]
+        e_pk = e["index"]
+
+
+        for feature in e_fe:
+            sql1 += f", {e_tn}1.{feature}"
+
+        sql2 += f" left join {e_tn} {e_tn}1 on {eol_tn}.{eol_pk} = {e_tn}1.{e_pk}"
 
 
 
+    for child, cf in get_agg_features(features):
+
+        c_tn = child["table"]
+        c_parentk = get_parent_key(entity_set_name, target, child["name"])
+
+        for f in cf:
+            c_nm = f["name"]
+            sql2 += f" left join (select {c_tn}.{c_parentk}, {get_agg_function(c_tn, f)} as {c_nm} from {c_tn} group by {c_tn}.{c_parentk}) {c_tn}{c_nm} on {me_tn}.{me_pk} = {c_tn}{c_nm}.{c_parentk}"
+            sql1 += f", {c_tn}{c_nm}.{c_nm}"
+
+
+    sql = sql1 + sql2
+
+    df = pd.read_sql(sql, connection)
+
+    return df
+
+
+
+#this needs a lot of work
+def get_event_training_df(features):
+
+    entity_set_name = features["entity_set"]
+    target = features["target_entity"]
+    obs = features["observations"]
+
+    eol = obs["eol"]
+    eol["table"] = f"{entity_set_name}_eol"
+    if obs["data"] is not None:
+        write_eol(entity_set_name, obs["data"])
+
+    eol_tn = eol["table"]
+    eol_pk = eol["pk"]
+    eol_od = eol["observation_date"]
+    eol_lb = eol["label"]
+
+    sql1 = f"select {eol_tn}.{eol_pk}, {eol_tn}.{eol_od}, {eol_tn}.{eol_lb}"
+
+    sql2 = ""
+
+    sql3_ = f" from {eol_tn} "
+
+    sql3 = ""
+
+    sql4 = ""
+
+    for e, e_fe in get_primary_entities(features):
+        e_tn = e["table"]
+        e_pk = e["index"]
+        e_ed = e["time"]["field"]
+
+        for feature in e_fe:
+            sql2 += f", {e_tn}1.{feature}"
+
+        sql3 += f" left join {e_tn} {e_tn}1 on {eol_tn}.{eol_pk} = {e_tn}1.{e_pk} and \
+          {e_tn}1.{e_ed} = (select max({e_ed}) from {e_tn} {e_tn}2 where {e_tn}2.{e_pk} = {eol_tn}.{eol_pk} and {e_tn}2.{e_ed} <= {eol_tn}.{eol_od})"
+
+
+    e, e_fe = get_raw_features_from_event_table(features)
+    e_tn = e["table"]
+    e_pk = e["index"]
+    e_ed = e["time"]["field"]
+
+    for feature in e_fe:
+        sql2 += f", {e_tn}.{feature}"
+
+    sql3 += f" left join {e_tn} on {eol_tn}.{eol_pk} = {e_tn}.{e_pk} and \
+            {e_tn}.{e_ed} = {eol_tn}.{eol_od}"
+
+
+    #this only works for the target event...if we want to include other aggregations from other event tables, need to join via some other key.
+
+    for child, cf in get_agg_features(features):
+
+        c_tn = child["table"]
+        c_pk = child["index"]
+        c_d = child["time"]["field"]
+
+        for f in cf:
+            c_nm = f["name"]
+
+            sql4 += f" left join (select {eol_tn}.{eol_pk}, {eol_tn}.{eol_od}, {get_agg_function(c_tn, f)} as {c_nm} from \
+                  {eol_tn} join {c_tn} on {eol_tn}.{eol_pk} = {c_tn}.{c_pk} and {eol_tn}.{eol_od} >= {c_tn}.{c_d} group by \
+                  {eol_tn}.{eol_pk}, {eol_tn}.{eol_od} ) {c_tn}{c_nm}1 on \
+                  {eol_tn}.{eol_pk} = {c_tn}{c_nm}1.{eol_pk} and {eol_tn}.{eol_od} = {c_tn}{c_nm}1.{eol_od}"
+
+            sql2 += f" , {c_tn}{c_nm}1.{c_nm}"
+
+    sql = sql1 + sql2 + sql3_ + sql3 + sql4
+
+    df = pd.read_sql(sql, connection)
+
+    return df
 
 
 def get_training_df(features):
@@ -137,15 +272,11 @@ def get_training_df(features):
     obs = features["observations"]
 
 
-    if obs["type"] == "eol":
-        eol = obs["eol"]
-        eol["table"] = f"{entity_set_name}_eol"
-        if obs["data"] is not None:
-            write_eol(entity_set_name, obs["data"])
 
-
-    else:
-        return get_event_training_df(features)
+    eol = obs["eol"]
+    eol["table"] = f"{entity_set_name}_eol"
+    if obs["data"] is not None:
+        write_eol(entity_set_name, obs["data"])
 
 
     eol_tn = eol["table"]
@@ -164,6 +295,7 @@ def get_training_df(features):
     sql4 = ""
 
 
+    #need to get the right join key for non targetr primary_entities...join is through target table not eol_table...meh..could let slide actually..not an unresonable assumption
     for e, e_fe in get_primary_entities(features):
         e_tn = e["table"]
         e_pk = e["index"]
@@ -178,7 +310,7 @@ def get_training_df(features):
 
 
 
-    for child, cf in get_events(features):
+    for child, cf in get_agg_features(features):
 
         c_tn = child["table"]
         c_parentk = get_parent_key(entity_set_name, target, child["name"])
@@ -244,7 +376,7 @@ def get_prediction_df(features):
         sql5 += f" and {e_tn}.{e_ed} = (select max({e_ed}) from {e_tn} {e_tn}1 where {e_tn}1.{e_pk} = {e_tn}.{e_pk})"
 
 
-    for child, cf in get_events(features):
+    for child, cf in get_agg_features(features):
 
         c_tn = child["table"]
         c_parentk = get_parent_key(entity_set_name, target, child["name"])
@@ -289,7 +421,7 @@ def list_features(feature_set):
 
 
 
-type_mappings = {dtype('int64'): 'numerical', dtype('float64'): 'numerical', dtype('object'): 'category', dtype('bool'): 'binary', dtype('datetime64[ns]'): 'numeric'}
+type_mappings = {dtype('int64'): 'numerical', dtype('float64'): 'numerical', dtype('object'): 'category', dtype('bool'): 'binary', dtype('datetime64[ns]'): 'numerical'}
 
 
 def get_model_definition(features):
