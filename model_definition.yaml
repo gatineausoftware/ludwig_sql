@@ -1,26 +1,22 @@
 input_features:
-- name: Class
+- name: agent_id
   type: numerical
-- name: Sex
-  type: category
-- name: Age
+- name: observation_time
+  type: numeric
+- name: feature_1
   type: numerical
-  preprocessing:
-          missing_value_strategy: fill_with_mean
-          normalization: zscore
-- name: SibSp
+- name: feature_2
   type: numerical
-- name: Parch
+- name: feature_6
   type: numerical
-- name: Fare
+- name: zipcode
   type: numerical
-- name: Cabin
-  type: category
+- name: num_household
+  type: numerical
+- name: total_sales
+  type: numerical
+- name: max_sales
+  type: numerical
 output_features:
-- name: Survived
-  type: binary
-  num_fc_layers: 2
-  fc_size: 128
-training:
-    batch_size: 128
-    epochs: 200
+- name: prediction
+  type: numerical

@@ -2,7 +2,8 @@
 import sqlalchemy as db
 import pandas as pd
 from sqlalchemy import MetaData
-from sqlalchemy import Table
+from numpy import dtype
+import yaml
 
 
 
@@ -53,6 +54,8 @@ def add_entity_df(df, entity):
         return
 
     add_entity(entity)
+
+
 
 
 
@@ -284,6 +287,37 @@ def list_features(feature_set):
     return features
 
 
+
+
+type_mappings = {dtype('int64'): 'numerical', dtype('float64'): 'numerical', dtype('object'): 'category', dtype('bool'): 'binary', dtype('datetime64[ns]'): 'numeric'}
+
+
+def get_model_definition(features):
+
+    df = get_training_df(features)
+    target = features["observations"]["eol"]["label"]
+    input_features = []
+
+    for col in df.columns:
+        if col == target:
+            continue
+        n = str(df[col].name)
+        t = df[col].dtype
+        print(t)
+        input_features.append({'name': n, 'type': type_mappings[t]})
+
+
+    model_def = {}
+    model_def['input_features'] = input_features
+    model_def['output_features'] =  [{'name':target, 'type': 'numerical'}]
+
+    return model_def
+
+def generate_base_model_definition(df):
+    model_def = get_model_definition(df)
+    #some versioning would be good
+    with open('model_definition.yaml', 'w') as yaml_file:
+        yaml.dump(model_def, yaml_file, default_flow_style=False)
 
 
 
