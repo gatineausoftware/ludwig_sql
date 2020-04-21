@@ -164,9 +164,9 @@ def get_training_df_el(features):
 
 
         for feature in e_fe:
-            sql1 += f", {e_tn}1.{feature}"
+            sql1 += f", {e_tn}.{feature}"
 
-        sql2 += f" left join {e_tn} {e_tn}1 on {eol_tn}.{eol_pk} = {e_tn}1.{e_pk}"
+        sql2 += f" left join {e_tn} on {eol_tn}.{eol_pk} = {e_tn}.{e_pk}"
 
 
 
@@ -177,7 +177,7 @@ def get_training_df_el(features):
 
         for f in cf:
             c_nm = f["name"]
-            sql2 += f" left join (select {c_tn}.{c_parentk}, {get_agg_function(c_tn, f)} as {c_nm} from {c_tn} group by {c_tn}.{c_parentk}) {c_tn}{c_nm} on {me_tn}.{me_pk} = {c_tn}{c_nm}.{c_parentk}"
+            sql2 += f" left join (select {c_tn}.{c_parentk}, {get_agg_function(c_tn, f)} as {c_nm} from {c_tn} group by {c_tn}.{c_parentk}) {c_tn}{c_nm} on {e_tn}.{e_pk} = {c_tn}{c_nm}.{c_parentk}"
             sql1 += f", {c_tn}{c_nm}.{c_nm}"
 
 
@@ -439,7 +439,7 @@ def get_model_definition(features):
 
     model_def = {}
     model_def['input_features'] = input_features
-    model_def['output_features'] = [{'name': target, 'type': 'binary'}]
+    model_def['output_features'] = [{'name': target, 'type': 'binary'}]  #don't remember why i need to cheat here....
 
     return model_def
 
