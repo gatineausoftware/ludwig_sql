@@ -426,7 +426,7 @@ type_mappings = {dtype('int64'): 'numerical', dtype('float64'): 'numerical', dty
 
 def get_model_definition(features):
 
-    df = get_training_df(features)
+    df = get_training_df_el(features)
     target = features["observations"]["eol"]["label"]
     input_features = []
 
@@ -435,18 +435,16 @@ def get_model_definition(features):
             continue
         n = str(df[col].name)
         t = df[col].dtype
-        print(t)
         input_features.append({'name': n, 'type': type_mappings[t]})
-
 
     model_def = {}
     model_def['input_features'] = input_features
-    model_def['output_features'] =  [{'name':target, 'type': 'numerical'}]
+    model_def['output_features'] = [{'name': target, 'type': 'binary'}]
 
     return model_def
 
-def generate_base_model_definition(df):
-    model_def = get_model_definition(df)
+def generate_base_model_definition(features):
+    model_def = get_model_definition(features)
     #some versioning would be good
     with open('model_definition.yaml', 'w') as yaml_file:
         yaml.dump(model_def, yaml_file, default_flow_style=False)
