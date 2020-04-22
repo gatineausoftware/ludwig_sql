@@ -1,12 +1,13 @@
 input_features:
-- name: PassengerId
-  type: numerical
 - name: Pclass
   type: numerical
 - name: Sex
   type: category
 - name: Age
   type: numerical
+  preprocessing:
+          missing_value_strategy: fill_with_mean
+          normalization: zscore  
 - name: SibSp
   type: numerical
 - name: Parch
@@ -17,14 +18,11 @@ input_features:
   type: numerical
 - name: Cabin
   type: category
-- name: Embarked
-  type: category
-- name: total_buffet
-  type: numerical
-- name: max_buffet
-  type: numerical
-- name: total_ballroom
-  type: numerical
 output_features:
 - name: Survived
   type: binary
+  num_fc_layers: 2
+  fc_size: 128
+training:
+    batch_size: 32
+    epochs: 200
